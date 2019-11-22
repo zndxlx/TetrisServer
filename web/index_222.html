@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Demo222</title>
+    <link rel="stylesheet" href="./css/index.css">
+</head>
+
+<body>
+    <div class="game">
+        <div class="p1 main">
+
+        </div>
+        <div class="p2 main">
+
+        </div>
+    </div>
+
+    <div id="container">
+        <ul>
+            <li v-for="msg in messages">[<span style="color:red;">{{msg.fuid}}</span>]{{msg.content}}</li>
+        </ul>
+        <div class="p2pmsg">
+            <input type="text" v-model="tuid">
+            <input type="text" v-model="p2pInputMsg">
+            <input type="button" v-on:click="sendP2PMsg" value="SendP2PMsg">
+        </div>
+        <div class="p2pmsg">
+            <input type="text" v-model="roomInputMsg">
+            <input type="button" v-on:click="sendRoomMsg" value="SendRoomMsg">
+        </div>
+        <div class="join">
+            <input type="text" v-model="roomNo">
+            <input type="button" v-on:click="joinRoom" value="加入房间">
+        </div>
+
+        <div class="control">
+            <input type="button" v-on:click="createRoom" value="创建房间">
+            <input type="button" v-on:click="gameLeft" value="左">
+            <input type="button" v-on:click="gameRight" value="右">
+            <input type="button" v-on:click="gameDown" value="下">
+            <input type="button" v-on:click="gameTrans" value="变形">
+            <input type="button" v-on:click="gamePause" value="暂停">
+            <input type="button" v-on:click="gameStart" value="开始">
+        </div>
+
+    </div>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/vue/1.0.26/vue.min.js" type="text/javascript"></script>
+    <!--[starx websocket library](https://github.com/lonnng/nano-client-websocket)-->
+    <script src="./js/protocol.js" type="text/javascript"></script>
+    <script src="./js/starx-wsclient.js" type="text/javascript"></script>
+    <script>
+        var v = new Vue({
+            el: "#container",
+            data: {
+                tuid: 0,
+                p2pInputMsg: '',
+                roomInputMsg: '',
+                messages: [],
+                roomNo: '111'
+            },
+            methods: {
+                sendP2PMsg: function () {
+                    console.log(this.p2pInputMsg);
+                    starx.notify('Hall.P2PMsg', { tuid: this.tuid_num, content: this.p2pInputMsg });
+                    this.p2pInputMsg = '';
+                },
+                sendRoomMsg: function () {
+                    console.log(this.roomInputMsg);
+                    starx.notify('RoomManager.RoomMsg', { content: this.roomInputMsg });
+                    this.roomInputMsg = '';
+                },
+
+                gameLeft: function () {
+                    starx.notify('RoomManager.GameCmd', { op: 1 });
+                },
+                gameRight: function () {
+                    starx.notify('RoomManager.GameCmd', { op: 2 });
+                },
+                gameDown: function () {
+                    starx.notify('RoomManager.GameCmd', { op: 3 });
+                },
+                gameTrans: function () {
+                    starx.notify('RoomManager.GameCmd', { op: 4 });
+                },
+                gamePause: function () {
+                    starx.notify('RoomManager.GameCmd', { op: 5 });
+                },
+                gameStart: function () {
+                    starx.notify('RoomManager.GameCmd', { op: 6 });
+                },
+                createRoom: function () {
+                    starx.request("RoomManager.CreateRoom", { "Version": "1.0" }, onCreateRoom);
+                },
+                joinRoom: function () {
+                    starx.request('RoomManager.JoinRoom', { "RoomNo": this.roomNo }, onJoinRoom);
+                }
+            },
+            computed: {
+                tuid_num: function () {
+                    return parseInt(this.tuid)
+                }
+            }
+        });
+
+        var OnP2PMsg = function (msg) {
+            v.messages.push(msg)
+        };
+        var OnRoomMsg = function (msg) {
+            v.messages.push(msg)
+        };
+
+        var onCreateRoom = function (data) {
+            console.log(data);
+        }
+
+        var onJoinRoom = function (data) {
+            console.log(data);
+        }
+
+        var OnRoomStateChange = function (data) {
+            console.log(data);
+        }
+        var OnGameStateChange = function (data) {
+            console.log(data);
+            if (data.uid == 222) {
+                render1.update(data.bord)
+            } else {
+                render2.update(data.bord)
+            }
+
+        }
+
+        var login = function (data) {
+            console.log("111111");
+            console.log(data);
+            console.log(data.code);
+            if (data.code === 0) {
+                console.log("data.code === 0");
+                v.messages.push({ content: data.result });
+            }
+        }
+
+        starx.init({ host: '127.0.0.1', port: 3250, path: '/nano' }, function () {
+            console.log("initialized");
+            starx.on('OnP2PMsg', OnP2PMsg)
+            starx.on('OnRoomMsg', OnRoomMsg)
+            starx.on('OnRoomStateChange', OnRoomStateChange)
+            starx.on('OnGameStateChange', OnGameStateChange)
+
+            starx.request("Hall.Login", { "uid": 222 }, login);
+        })
+
+        class Bord {
+            constructor(w, h) {
+                this._width = w || 10;
+                this._height = h || 18;
+                this._bord = new Array(this._height);
+                for (let i = 0; i < this._height; i++) {
+                    this._bord[i] = new Array(this._width);
+                    for (let j = 0; j < this._width; j++) {
+                        this._bord[i][j] = 0;
+                    }
+                }
+            }
+            getW() {
+                return this._width;
+            }
+
+            getH() {
+                return this._height;
+            }
+
+            get(x, y) {
+                if (x >= this._width || y >= this._height || x < 0 || y < 0) {
+                    //console.log("Bord get, x or y excced");
+                    return undefined;
+                }
+                return this._bord[y][x];
+            }
+            set(x, y, v) {
+                if (x >= this._width || y >= this._height || x < 0 || y < 0) {
+                    //console.log("Bord set, x or y excced");
+                    return undefined;
+                }
+                this._bord[y][x] = v;
+                return this;
+            }
+            //比较两个border，返回不同的地方坐标列表
+            diff(bord) {
+                let res = []
+                for (let i = 0; i < this._height; i++) {
+                    for (let j = 0; j < this._width; j++) {
+                        if (this._bord[i][j] != bord[i][j]) {
+                            res.push({ x: j, y: i })
+                        }
+                    }
+                }
+                return res
+            }
+        }
+        class Render {
+            constructor(p) {
+                this._oldbord = new (Bord);
+                //this._newbord = new (Bord);
+                this.BLOCK_SIZE = 20;
+                console.log(p)
+                this._mainEl = document.querySelector(p);
+                console.log(this._mainEl)
+                this.init();
+            }
+
+            update(bord) {
+                let res = this._oldbord.diff(bord);
+                //console.log(res);
+
+                res.forEach((item) => {
+                    //console.log(item);
+                    let index = item.y * this._oldbord.getW() + item.x;
+                    let el = this._mainEl.children[index];
+                    let v = bord[item.y][item.x];
+                    if (v == 2) {
+                        el.className = 'brick brickActivity';
+                    } else if (v == 0) {
+                        el.className = 'brick brickNone';
+                    } else if (v == 1) {
+                        el.className = 'brick brickInactivity';
+                    } else {
+                        console.log(`unknow value `);
+                        //continue;
+                    }
+
+                    this._oldbord.set(item.x, item.y, bord[item.y][item.x]);
+                });
+
+            }
+
+            init() {
+                for (let i = 0; i < this._oldbord.getH(); i++) {
+                    for (let j = 0; j < this._oldbord.getW(); j++) {
+                        //console.log('hahahah');
+
+                        let brick = document.createElement('div');
+                        brick.className = 'brick brickNone';
+
+                        brick.style.top = `${i * this.BLOCK_SIZE}px`;
+                        brick.style.left = `${j * this.BLOCK_SIZE}px`;
+                        this._mainEl.appendChild(brick);
+                    }
+                }
+            }
+        }
+
+        var render1 = new Render(".p1")
+        var render2 = new Render(".p2")
+        // function init() {
+        //     let render
+        // }
+
+        // init();
+        // let b = new Array(18);
+        // for (let i = 0; i < 18; i++) {
+        //     b[i] = new Array(10);
+        //     for (let j = 0; j < 10; j++) {
+        //         b[i][j] = 1;
+        //     }
+        // }
+        // render.update(b)
+    </script>
+</body>
+
+</html>

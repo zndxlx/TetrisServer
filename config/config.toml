@@ -1,0 +1,4 @@
+[core]
+# enable debug mode
+debug = true
+heartbeat = 30
